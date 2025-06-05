@@ -6,11 +6,11 @@ A simple DRM driver for VoCore MPRO screen.
 
 This repository provides multiple branches corresponding to different kernel versions. You can select the corresponding branch based on the kernel version you are using, and then execute the following command to install the module into the system.
 
+For linux 6.12.
+
 ```
-git clone https://github.com/ieiao/mpro_drm.git
+git clone https://github.com/Vonger/mpro_drm
 cd mpro_drm
-# Switch to the correct branch
-git checkout -t origin/6.10.y
 make
 sudo make install
 ```
@@ -24,6 +24,7 @@ We can install the MPRO DRM driver into the Raspberry Pi OS through the followin
 ```
 git clone https://github.com/ieiao/mpro_drm.git
 cd mpro_drm
+# this part you can choose your linux kernel version.
 git checkout -t origin/6.6.y-dma
 make
 sudo make install
