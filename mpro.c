@@ -21,6 +21,7 @@
 #include <drm/drm_format_helper.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_framebuffer.h>
+#include <drm/drm_fbdev_ttm.h>
 #include <drm/drm_gem_atomic_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_gem_shmem_helper.h>
@@ -216,7 +217,7 @@ static int mpro_update_frame(struct mpro_device *mpro, unsigned int len)
 }
 
 static int mpro_buf_copy(void *dst, struct iosys_map *src_map, struct drm_framebuffer *fb,
-			 struct drm_rect *clip)
+			 struct drm_rect *clip, struct drm_format_conv_state *fmtcnv_state)
 {
 	int ret;
 	struct iosys_map dst_map;
@@ -227,7 +228,7 @@ static int mpro_buf_copy(void *dst, struct iosys_map *src_map, struct drm_frameb
 	if (ret)
 		return ret;
 
-	drm_fb_xrgb8888_to_rgb565(&dst_map, NULL, src_map, fb, clip, false);
+	drm_fb_xrgb8888_to_rgb565(&dst_map, NULL, src_map, fb, clip, fmtcnv_state, false);
 
 	drm_gem_fb_end_cpu_access(fb, DMA_FROM_DEVICE);
 
@@ -235,7 +236,7 @@ static int mpro_buf_copy(void *dst, struct iosys_map *src_map, struct drm_frameb
 }
 
 static void mpro_fb_mark_dirty(struct iosys_map *src, struct drm_framebuffer *fb,
-				struct drm_rect *rect)
+				struct drm_rect *rect, struct drm_format_conv_state *fmtcnv_stat)
 {
 	struct mpro_device *mpro = to_mpro(fb->dev);
 	int idx, len, width, height, ret;
@@ -243,7 +244,7 @@ static void mpro_fb_mark_dirty(struct iosys_map *src, struct drm_framebuffer *fb
 	if (!drm_dev_enter(fb->dev, &idx))
 		return;
 
-	ret = mpro_buf_copy(mpro->draw_buf, src, fb, rect);
+	ret = mpro_buf_copy(mpro->draw_buf, src, fb, rect, fmtcnv_stat);
 	if (ret)
 		goto err_msg;
 
@@ -401,7 +402,8 @@ static void mpro_pipe_enable(struct drm_simple_display_pipe *pipe,
 	};
 
 	mpro_send_command(mpro, cmd_quit_sleep, sizeof(cmd_quit_sleep));
-	mpro_fb_mark_dirty(&shadow_plane_state->data[0], fb, &rect);
+	mpro_fb_mark_dirty(&shadow_plane_state->data[0], fb, &rect,
+			&shadow_plane_state->fmtcnv_state);
 }
 
 static void mpro_pipe_disable(struct drm_simple_display_pipe *pipe)
@@ -422,7 +424,8 @@ static void mpro_pipe_update(struct drm_simple_display_pipe *pipe,
 		return;
 
 	if (drm_atomic_helper_damage_merged(old_state, state, &rect))
-		mpro_fb_mark_dirty(&shadow_plane_state->data[0], fb, &rect);
+		mpro_fb_mark_dirty(&shadow_plane_state->data[0], fb, &rect,
+				&shadow_plane_state->fmtcnv_state);
 }
 
 static const struct drm_simple_display_pipe_funcs mpro_pipe_funcs = {
@@ -873,7 +876,7 @@ static int mpro_usb_probe(struct usb_interface *interface,
 	if (ret)
 		goto err_put_device;
 
-	drm_fbdev_generic_setup(dev, 0);
+	drm_fbdev_ttm_setup(dev, 0);
 
 	ret = mpro_touch_init(interface, mpro);
 
